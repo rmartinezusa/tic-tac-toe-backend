@@ -28,6 +28,7 @@ const prisma = new PrismaClient().$extends({
                     }
                     return user
                 } catch (e) {
+                    if (e.code === "P2025") throw Error("User not found");
                     throw e;
                 }
             },
