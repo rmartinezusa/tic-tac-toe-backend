@@ -19,3 +19,17 @@ Content-Type: application/json
   "password": "pass123"
 }
 
+### token 
+@token = {{login.response.body.token}}
+
+### GET users 
+GET {{host}}/users
+Authorization: Bearer {{token}}
+
+### GET logged-in user
+GET {{host}}/users/me
+Authorization: Bearer {{token}}
+
+### GET user by ID
+GET {{host}}/users/1
+Authorization: Bearer {{token}}
