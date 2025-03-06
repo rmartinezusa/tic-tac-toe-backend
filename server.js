@@ -1,19 +1,27 @@
 const express = require("express");
-const app = express();
-const PORT = 3000;
-
+const http = require("http"); 
 const cors = require("cors");
+const morgan = require("morgan");
+const dotenv = require("dotenv");
+const { initializeSocket } = require("./socket"); 
+
+dotenv.config();
+
+const app = express();
+const server = http.createServer(app);
+const PORT = process.env.PORT || 3000;
+
+// Middleware
 app.use(cors({ origin: /localhost/ }));
-
-
-require("dotenv").config();
-
-app.use(require("morgan")("dev"));
+app.use(morgan("dev"));
 app.use(express.json());
 
+// Routes
 app.use(require("./api/auth").router);
 app.use("/users", require("./api/users"));
+app.use("/game", require("./api/game")); 
 
+// Handle 404 errors
 app.use((req, res, next) => {
     next({ status: 404, message: "Endpoint not found." });
 });
@@ -21,10 +29,13 @@ app.use((req, res, next) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err);
-    res.status(err.status ?? 500);
-    res.json(err.message ?? "Sorry, something broke :(");
+    res.status(err.status ?? 500).json(err.message ?? "Something broke :(");
 });
 
-app.listen(PORT, () => {
+// Initialize Socket.io
+initializeSocket(server);
+
+// Start server
+server.listen(PORT, () => {
     console.log(`Listening on port ${PORT}...`);
 });
