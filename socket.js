@@ -1,8 +1,7 @@
 const { Server } = require("socket.io");
 const { PrismaClient } = require("@prisma/client");
-
+const { checkWinner } = require("./utils/gameLogic");
 const prisma = new PrismaClient();
-
 
 function initializeSocket(server) {
     const io = new Server(server, {
@@ -22,21 +21,24 @@ function initializeSocket(server) {
 
         socket.on("makeMove", async ({ gameId, playerId, position }) => {
             try {
-                const game = await prisma.game.findUnique({ where: { id: +gameId } }); // I need to see if game id is comming in as an int or str.
-                
+                const game = await prisma.game.findUnique({ where: { id: +gameId } });
+
                 if (!game) return socket.emit("error", "Game not found");
 
-                // Prevent moves after game is completed
                 if (game.status !== "ONGOING") return socket.emit("error", "Game is already finished");
 
-                // Validate player turn (even = X, odd = O)
+                const existingMove = await prisma.move.findFirst({
+                    where: { gameId, position },
+                });
+
+                if (existingMove) return socket.emit("error", "Position already taken");
+
                 const moveCount = await prisma.move.count({ where: { gameId } });
                 const isPlayerX = playerId === game.playerXId;
                 if ((moveCount % 2 === 0 && !isPlayerX) || (moveCount % 2 !== 0 && isPlayerX)) {
                     return socket.emit("error", "Not your turn!");
                 }
 
-                // Save the move
                 const move = await prisma.move.create({
                     data: {
                         gameId,
@@ -49,7 +51,6 @@ function initializeSocket(server) {
                 // Broadcast move
                 io.to(`game-${gameId}`).emit("moveMade", move);
 
-                // Check for a winner (implement logic in a helper function)
                 const winner = await checkWinner(gameId);
                 if (winner) {
                     await prisma.game.update({

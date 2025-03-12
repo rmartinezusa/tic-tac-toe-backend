@@ -3,8 +3,6 @@ const router = express.Router();
 const prisma = require("../prisma");
 const { authenticate } = require("./auth");
 
-module.exports = router;
-
 // GET users
 router.get("/", authenticate, async (req, res, next) => {
     try {
@@ -63,3 +61,5 @@ router.get("/:id", authenticate, async (req, res, next) => {
         next(e);
     }
 });
+
+module.exports = router;

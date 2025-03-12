@@ -19,7 +19,8 @@ app.use(express.json());
 // Routes
 app.use(require("./api/auth").router);
 app.use("/users", require("./api/users"));
-app.use("/game", require("./api/game")); 
+app.use("/games", require("./api/games")); 
+app.use("/moves", require("./api/moves"));
 
 // Handle 404 errors
 app.use((req, res, next) => {
