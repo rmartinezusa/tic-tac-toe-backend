@@ -15,8 +15,34 @@ function initializeSocket(server) {
         console.log(`User connected: ${socket.id}`);
 
         socket.on("joinGame", async ({ gameId, userId }) => {
+            console.log(`Received joinGame event with gameId: ${gameId} and userId: ${userId}`);
+        
+            if (!gameId) {
+                console.error("Error: gameId is missing in joinGame event");
+                return socket.emit("error", "Invalid game ID");
+            }
+        
             socket.join(`game-${gameId}`);
             console.log(`User ${userId} joined Game ${gameId}`);
+        
+            const game = await prisma.game.findUnique({
+                where: { id: parseInt(gameId, 10) }
+            });
+        
+            if (!game) {
+                console.error(`Game with ID ${gameId} not found`);
+                return socket.emit("error", "Game not found");
+            }
+        
+            const moves = await prisma.move.findMany({
+                where: { gameId },
+                orderBy: { moveOrder: "asc" },
+            });
+        
+            io.to(`game-${gameId}`).emit("gameUpdated", {
+                board: moves.map((move) => ({ position: move.position, playerId: move.playerId })),
+                turn: moves.length % 2 === 0 ? game.playerXId : game.playerOId,
+            });
         });
 
         socket.on("makeMove", async ({ gameId, playerId, position }) => {
@@ -48,8 +74,15 @@ function initializeSocket(server) {
                     },
                 });
 
-                // Broadcast move
-                io.to(`game-${gameId}`).emit("moveMade", move);
+                const moves = await prisma.move.findMany({
+                    where: { gameId },
+                    orderBy: { moveOrder: "asc" },
+                });
+
+                io.to(`game-${gameId}`).emit("gameUpdated", {
+                    board: moves.map((move) => ({ position: move.position, playerId: move.playerId })),
+                    turn: moveCount % 2 === 0 ? game.playerOId : game.playerXId, 
+                });
 
                 const winner = await checkWinner(gameId);
                 if (winner) {

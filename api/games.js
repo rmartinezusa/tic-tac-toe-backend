@@ -1,32 +1,39 @@
 const express = require("express");
-const { PrismaClient } = require("@prisma/client");
-
-const prisma = new PrismaClient();
 const router = express.Router();
+const prisma = require("../prisma");
+const { authenticate } = require("./auth");
+
+
 
 // Create a new game
-router.post("/create", async (req, res) => {
+router.post("/", authenticate, async (req, res, next) => {
     const { playerXId, playerOId } = req.body;
     if (!playerXId || !playerOId) return res.status(400).json({ error: "Both players are required" });
 
     try {
         const game = await prisma.game.create({
-            data: { playerXId, playerOId },
+            data: { 
+                playerXId, 
+                playerOId,
+                status: "ONGOING"
+            },
         });
 
         res.json(game);
     } catch (error) {
-        res.status(500).json({ error: "Failed to create game" });
+        console.error("Error creating game:", error);
+        res.status(500).json({ error: "Failed to create game", details: error.message });
     }
 });
 
 // Get game state
-router.get("/:gameId", async (req, res) => {
+router.get("/:gameId", authenticate, async (req, res, next) => {
     const { gameId } = req.params;
+    if (isNaN(gameId)) return res.status(400).json({ error: "Invalid game ID" });
 
     try {
         const game = await prisma.game.findUnique({
-            where: { id: parseInt(gameId) },
+            where: { id: +gameId },
             include: { moves: true },
         });
 
