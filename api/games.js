@@ -26,6 +26,31 @@ router.post("/", authenticate, async (req, res, next) => {
     }
 });
 
+// Check if game is active
+router.get("/active", authenticate, async (req, res, next) => {
+    const { playerXId, playerOId } = req.query;
+
+    if (!playerXId || !playerOId) {
+        return res.status(400).json({ error: "Missing player IDs" });
+    }
+
+    try {
+        const existingGame = await prisma.game.findFirst({
+            where: {
+                OR: [
+                    { playerXId: +playerXId, playerOId: +playerOId },
+                    { playerXId: +playerOId, playerOId: +playerXId }
+                ],
+                status: "ONGOING"
+            }
+        });
+
+        res.json({ activeGame: existingGame || null });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Get game state
 router.get("/:gameId", authenticate, async (req, res, next) => {
     const { gameId } = req.params;
@@ -41,8 +66,9 @@ router.get("/:gameId", authenticate, async (req, res, next) => {
 
         res.json(game);
     } catch (error) {
-        res.status(500).json({ error: "Failed to fetch game" });
+        res.status(500).json({ error: "Failed to fetch game" }); // will need to comeback and change all error to "next()"
     }
 });
+
 
 module.exports = router;

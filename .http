@@ -15,8 +15,8 @@ POST {{host}}/login
 Content-Type: application/json
 
 {
-  "username": "user123",
-  "password": "pass123"
+  "username": "123",
+  "password": "123"
 }
 
 ### token 
@@ -32,4 +32,8 @@ Authorization: Bearer {{token}}
 
 ### GET user by ID
 GET {{host}}/users/1
+Authorization: Bearer {{token}}
+
+### GET check 
+GET {{host}}/games/active?playerXId=3&playerOId=1
 Authorization: Bearer {{token}}
