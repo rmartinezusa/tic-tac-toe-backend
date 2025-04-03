@@ -3,9 +3,8 @@ const http = require("http");
 const cors = require("cors");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
-const { initializeSocket } = require("./socket"); 
-
 dotenv.config();
+const { initializeSocket } = require("./socket"); 
 
 const app = express();
 const server = http.createServer(app);
