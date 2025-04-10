@@ -1,7 +1,31 @@
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
-const JWT_SECRET = process.env.JWT_SECRET;
 const axios = require("axios");
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
+
+// In-memory game state storage
+const gameRooms = {}; // { [gameId]: { board: [], turn: 'X', players: Set(socket.id) } }
+
+function checkWinner(squares) {
+    const lines = [
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8],
+        [0, 3, 6],
+        [1, 4, 7],
+        [2, 5, 8],
+        [0, 4, 8],
+        [2, 4, 6],
+    ];
+    for (let [a, b, c] of lines) {
+        if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
+            return squares[a];
+        }
+    }
+    return null;
+}
 
 function initializeSocket(server) {
     const io = new Server(server, {
@@ -13,7 +37,7 @@ function initializeSocket(server) {
 
     // Middleware to verify token before connection
     io.use((socket, next) => {
-        const token = socket.handshake.auth.token; 
+        const token = socket.handshake.auth.token;
 
         if (!token) {
             return next(new Error("Authentication error: No token provided"));
@@ -28,7 +52,6 @@ function initializeSocket(server) {
         }
     });
 
-    // I will have to eventualy make the url in a global variable!!!!
     io.on("connection", (socket) => {
         console.log(`User connected: ${socket.id}, User ID: ${socket.userId}`);
 
@@ -37,50 +60,101 @@ function initializeSocket(server) {
                 console.error("Missing player IDs");
                 return;
             }
-    
+
             try {
                 // Check if an active game exists
-                const activeGameResponse = await axios.get(
-                    //global variable HERE!!!
-                    "http://localhost:3000/games/active", {
+                const activeGameResponse = await axios.get(`${API_BASE_URL}/games/active`, {
                     params: { playerXId: userId, playerOId: opponentId },
                     headers: { Authorization: `Bearer ${socket.handshake.auth.token}` },
                 });
-    
+
                 const activeGame = activeGameResponse.data.activeGame;
 
-                // Emit to the client that the game is already active
                 if (activeGame) {
                     console.log(`Active game found: ${activeGame.id}`);
                     socket.emit("game-start", { gameId: activeGame.id });
                     return;
                 }
-    
-                // Create a new game via API
+
+                // Create a new game
                 const newGameResponse = await axios.post(
-                    //global variable HERE!!!
-                    "http://localhost:3000/games",
+                    `${API_BASE_URL}/games`,
                     { playerXId: userId, playerOId: opponentId },
                     { headers: { Authorization: `Bearer ${socket.handshake.auth.token}` } }
                 );
-    
+
                 const newGame = newGameResponse.data;
                 console.log(`New game created: ${newGame.id}`);
-    
-                // 3. Emit the game creation to both players
+
                 io.to(userId).emit("game-start", { gameId: newGame.id });
                 io.to(opponentId).emit("game-start", { gameId: newGame.id });
-    
+
             } catch (error) {
                 console.error("Error handling create-game event:", error.response?.data || error.message);
             }
         });
 
+        socket.on("joinGame", ({ gameId }) => {
+            socket.join(gameId);
+
+            if (!gameRooms[gameId]) {
+                gameRooms[gameId] = {
+                    board: Array(9).fill(null),
+                    turn: "X",
+                    players: new Set(),
+                };
+            }
+
+            gameRooms[gameId].players.add(socket.id);
+
+            io.to(gameId).emit("playersInGame", {
+                count: gameRooms[gameId].players.size,
+            });
+
+            socket.emit("gameUpdated", {
+                board: gameRooms[gameId].board,
+                turn: gameRooms[gameId].turn,
+            });
+
+            console.log(`User ${socket.id} joined game ${gameId}`);
+        });
+
+        socket.on("makeMove", ({ gameId, index }) => {
+            const game = gameRooms[gameId];
+            if (!game || game.board[index] !== null) return;
+
+            game.board[index] = game.turn;
+            const winner = checkWinner(game.board);
+
+            if (winner) {
+                io.to(gameId).emit("gameOver", { winner });
+            } else {
+                game.turn = game.turn === "X" ? "O" : "X";
+                io.to(gameId).emit("gameUpdated", {
+                    board: game.board,
+                    turn: game.turn,
+                });
+            }
+        });
+
         socket.on("disconnect", () => {
             console.log(`User disconnected: ${socket.id}`);
+
+            for (const [gameId, game] of Object.entries(gameRooms)) {
+                if (game.players.has(socket.id)) {
+                    game.players.delete(socket.id);
+
+                    io.to(gameId).emit("playersInGame", {
+                        count: game.players.size,
+                    });
+
+                    if (game.players.size === 0) {
+                        delete gameRooms[gameId];
+                    }
+                }
+            }
         });
     });
-
 }
 
 module.exports = { initializeSocket };
