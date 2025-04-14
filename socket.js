@@ -94,34 +94,50 @@ function initializeSocket(server) {
             }
         });
 
-        socket.on("joinGame", ({ gameId }) => {
+        socket.on("joinGame", async ({ gameId }) => {
             socket.join(gameId);
-
+        
             if (!gameRooms[gameId]) {
-                gameRooms[gameId] = {
-                    board: Array(9).fill(null),
-                    turn: "X",
-                    players: new Set(),
-                };
+                try {
+                    const gameResponse = await axios.get(`${API_BASE_URL}/games/${gameId}`, {
+                        headers: { Authorization: `Bearer ${socket.handshake.auth.token}` },
+                    });
+        
+                    const { playerXId, playerOId } = gameResponse.data;
+        
+                    gameRooms[gameId] = {
+                        board: Array(9).fill(null),
+                        turn: "X",
+                        players: new Set(),
+                        playerXId,
+                        playerOId,
+                    };
+                } catch (error) {
+                    console.error(`Error fetching game ${gameId}:`, error.response?.data || error.message);
+                    return;
+                }
             }
-
+        
             gameRooms[gameId].players.add(socket.id);
-
+        
             io.to(gameId).emit("playersInGame", {
                 count: gameRooms[gameId].players.size,
             });
-
+        
             socket.emit("gameUpdated", {
                 board: gameRooms[gameId].board,
                 turn: gameRooms[gameId].turn,
             });
-
+        
             console.log(`User ${socket.id} joined game ${gameId}`);
         });
-
-        socket.on("makeMove", ({ gameId, index }) => {
+        
+        socket.on("makeMove", ({ gameId, index, playerId }) => {
             const game = gameRooms[gameId];
             if (!game || game.board[index] !== null) return;
+
+            const expectedPlayerId = game.turn === "X" ? game.playerXId : game.playerOId;            
+            if (playerId !== expectedPlayerId) return;
 
             game.board[index] = game.turn;
             const winner = checkWinner(game.board);
