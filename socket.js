@@ -143,7 +143,10 @@ function initializeSocket(server) {
             const winner = checkWinner(game.board);
 
             if (winner) {
-                io.to(gameId).emit("gameOver", { winner });
+                io.to(gameId).emit("gameOver", { 
+                    winner,
+                    board: game.board,
+                 });
             } else {
                 game.turn = game.turn === "X" ? "O" : "X";
                 io.to(gameId).emit("gameUpdated", {
