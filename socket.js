@@ -27,6 +27,8 @@ function checkWinner(squares) {
     return null;
 }
 
+const connectedUsers = {};
+
 function initializeSocket(server) {
     const io = new Server(server, {
         cors: {
@@ -54,6 +56,23 @@ function initializeSocket(server) {
 
     io.on("connection", (socket) => {
         console.log(`User connected: ${socket.id}, User ID: ${socket.userId}`);
+        connectedUsers[socket.userId] = socket.id;
+        
+        io.to(socket.id).emit("online-users", {
+            onlineUserIds: Object.keys(connectedUsers),
+        });
+
+        // Emit 'user-status' event when a user connects
+        io.emit("user-status", { userId: socket.userId, status: "online" });
+
+        // Emit current list of online user IDs to the newly connected user
+        socket.emit("online-users", Object.keys(connectedUsers));
+
+        socket.on("request-online-users", () => {
+            socket.emit("online-users", {
+                onlineUserIds: Object.keys(connectedUsers),
+            });
+        });
 
         socket.on("create-game", async ({ opponentId, userId }) => {
             if (!opponentId || !userId) {
@@ -158,6 +177,11 @@ function initializeSocket(server) {
 
         socket.on("disconnect", () => {
             console.log(`User disconnected: ${socket.id}`);
+
+            delete connectedUsers[socket.userId];
+
+            // Emit 'user-status' event when a user disconnects
+            io.emit("user-status", { userId: socket.userId, status: "offline" });
 
             for (const [gameId, game] of Object.entries(gameRooms)) {
                 if (game.players.has(socket.id)) {
