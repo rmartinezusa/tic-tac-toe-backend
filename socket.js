@@ -4,6 +4,7 @@ const axios = require("axios");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
+const CLINET_SIDE_URL = process.env.CLINET_SIDE_URL || "http://localhost:5173"
 
 // In-memory game state storage
 const gameRooms = {}; // { [gameId]: { board: [], turn: 'X', players: Set(socket.id) } }
@@ -32,7 +33,7 @@ const connectedUsers = {};
 function initializeSocket(server) {
     const io = new Server(server, {
         cors: {
-            origin: "http://localhost:5173",
+            origin: CLINET_SIDE_URL,
             methods: ["GET", "POST"],
         },
     });
