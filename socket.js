@@ -75,7 +75,8 @@ function initializeSocket(server) {
             });
         });
 
-        socket.on("create-game", async ({ opponentId, userId }) => {
+        socket.on("create-game", async ({ opponentId }) => {
+            const userId = socket.userId;
             if (!opponentId || !userId) {
                 console.error("Missing player IDs");
                 return;
