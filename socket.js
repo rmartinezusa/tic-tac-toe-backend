@@ -128,11 +128,33 @@ function initializeSocket(server) {
                         headers: { Authorization: `Bearer ${socket.handshake.auth.token}` },
                     });
         
-                    const { playerXId, playerOId } = gameResponse.data;
-        
+                    const { playerXId, playerOId, status } = gameResponse.data;
+
+                    let board = Array(9).fill(null);
+                    let turn = "X";
+
+                    if (status === "ONGOING") {
+
+                        const movesResponse = await axios.get(`${API_BASE_URL}/moves/${gameId}`, {
+                            headers: {
+                                Authorization: `Bearer ${socket.handshake.auth.token}`,
+                            },
+                        });
+
+                        const moves = movesResponse.data;
+
+                        for (let move of moves) {
+                            const symbol = move.playerId === playerXId ? "X" : "O";
+                            board[move.position] = symbol;
+                        }
+
+                        const lastSymbol = board.filter(Boolean).length % 2 === 0 ? "X" : "O";
+                        turn = lastSymbol;
+                    }
+
                     gameRooms[gameId] = {
-                        board: Array(9).fill(null),
-                        turn: "X",
+                        board,
+                        turn,
                         players: new Set(),
                         playerXId,
                         playerOId,
@@ -142,18 +164,18 @@ function initializeSocket(server) {
                     return;
                 }
             }
-        
+
             gameRooms[gameId].players.add(socket.id);
-        
+
             io.to(gameId).emit("playersInGame", {
                 count: gameRooms[gameId].players.size,
             });
-        
+            
             socket.emit("gameUpdated", {
                 board: gameRooms[gameId].board,
                 turn: gameRooms[gameId].turn,
             });
-        
+            
             console.log(`User ${socket.id} joined game ${gameId}`);
         });
         
