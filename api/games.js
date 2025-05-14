@@ -70,5 +70,29 @@ router.get("/:gameId", authenticate, async (req, res, next) => {
     }
 });
 
+// Patch game status 
+router.patch("/:gameId", authenticate, async (req, res) => {
+    const { gameId } = req.params;
+    const { status, winnerId } = req.body;
+
+    if (!["COMPLETED", "TIE", "ONGOING"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
+    }
+
+    try {
+        const updatedGame = await prisma.game.update({
+            where: { id: +gameId },
+            data: {
+                status,
+                ...(winnerId ? { winnerId } : {}),
+            },
+        });
+
+        res.json(updatedGame);
+    } catch (error) {
+        console.error("Failed to update game status:", error);
+        res.status(500).json({ error: "Could not update game", details: error.message });
+    }
+});
 
 module.exports = router;

@@ -38,6 +38,10 @@ function initializeSocket(server) {
         },
     });
 
+    function isBoardFull(board) {
+        return board.every(cell => cell !== null);
+    }
+
     // Middleware to verify token before connection
     io.use((socket, next) => {
         const token = socket.handshake.auth.token;
@@ -153,7 +157,7 @@ function initializeSocket(server) {
             console.log(`User ${socket.id} joined game ${gameId}`);
         });
         
-        socket.on("makeMove", ({ gameId, index, playerId }) => {
+        socket.on("makeMove", async ({ gameId, index, playerId }) => {
             const game = gameRooms[gameId];
             if (!game || game.board[index] !== null) return;
 
@@ -161,20 +165,60 @@ function initializeSocket(server) {
             if (playerId !== expectedPlayerId) return;
 
             game.board[index] = game.turn;
-            const winner = checkWinner(game.board);
 
-            if (winner) {
-                io.to(gameId).emit("gameOver", { 
-                    winner,
-                    board: game.board,
-                 });
-            } else {
-                game.turn = game.turn === "X" ? "O" : "X";
-                io.to(gameId).emit("gameUpdated", {
-                    board: game.board,
-                    turn: game.turn,
+            try {
+                await axios.post(`${API_BASE_URL}/moves`, {
+                    gameId,
+                    playerId,
+                    position: index,
+                }, {
+                    headers: {
+                        Authorization: `Bearer ${socket.handshake.auth.token}`,
+                    },
                 });
+            } catch (e) {
+                console.error("Failed to record move:", e.response?.data || e.message);
+                return;
             }
+
+            const winnerSymbol = checkWinner(game.board);
+            let newStatus = "ONGOING";
+            let winnerId = null;
+
+            if (winnerSymbol) {
+                newStatus = "COMPLETED";
+                winnerId = winnerSymbol === "X" ? game.playerXId : game.playerOId;
+            } else if (isBoardFull(game.board)) {
+                newStatus = "TIE";
+            }
+
+            if (newStatus !== "ONGOING") {
+                try {
+                    await axios.patch(`${API_BASE_URL}/games/${gameId}`, {
+                        status: newStatus,
+                        ...(winnerId ? { winnerId } : {}),
+                    }, {
+                        headers: {
+                            Authorization: `Bearer ${socket.handshake.auth.token}`,
+                        },
+                    });
+                } catch (e) {
+                    console.error("Failed to update game status:", e.response?.data || e.message);
+                }
+                
+                io.to(gameId).emit("gameOver", {
+                    winner: winnerSymbol,
+                    board: game.board,
+                });
+                return;
+            }
+            
+            game.turn = game.turn === "X" ? "O" : "X";
+           
+            io.to(gameId).emit("gameUpdated", {
+                board: game.board,
+                turn: game.turn,
+            });
         });
 
         socket.on("disconnect", () => {

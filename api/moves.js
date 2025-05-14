@@ -6,8 +6,9 @@ const { authenticate } = require("./auth");
 // Make a move in a game
 router.post("/", authenticate, async (req, res) => {
     try {
-        const { gameId, playerId, position } = req.body;
-
+        const gameId = +req.body.gameId;
+        const { playerId, position } = req.body;
+        
         const game = await prisma.game.findUnique({ where: { id: gameId } });
         if (!game) return res.status(404).json({ error: "Game not found" });
 
