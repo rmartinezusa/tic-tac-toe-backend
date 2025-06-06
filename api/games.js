@@ -26,6 +26,31 @@ router.post("/", authenticate, async (req, res, next) => {
     }
 });
 
+// Get last 5 games
+router.get("/", authenticate, async (req, res) => {
+    try {
+        const recentGames = await prisma.game.findMany({
+            orderBy: { createdAt: "desc" },
+            take: 5,
+            include: {
+                playerX: { select: { username: true, id: true } },
+                playerO: { select: { username: true, id: true } },
+            },
+            where: { 
+                OR: [
+                    { status: "COMPLETED" },
+                    { status: "TIE" },
+                ]
+            } ,
+        });
+        console.log(recentGames);
+        res.json(recentGames);
+    } catch (error) {
+        console.error("Failed to get games:", error);
+        res.status(500).json({ error: "Failed to fetch games" });
+    }
+});
+
 // Check if game is active
 router.get("/active", authenticate, async (req, res, next) => {
     const { playerXId, playerOId } = req.query;
