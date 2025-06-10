@@ -3,8 +3,6 @@ const router = express.Router();
 const prisma = require("../prisma");
 const { authenticate } = require("./auth");
 
-
-
 // Create a new game
 router.post("/", authenticate, async (req, res, next) => {
     const { playerXId, playerOId } = req.body;
@@ -43,7 +41,6 @@ router.get("/", authenticate, async (req, res) => {
                 ]
             } ,
         });
-        console.log(recentGames);
         res.json(recentGames);
     } catch (error) {
         console.error("Failed to get games:", error);
