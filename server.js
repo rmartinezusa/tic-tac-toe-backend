@@ -9,9 +9,10 @@ const { initializeSocket } = require("./socket");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+const API_BASE_URL = process.env.API_BASE_URL || /localhost/;
 
 // Middleware
-app.use(cors({ origin: /localhost/ }));
+app.use(cors({ origin: API_BASE_URL})); 
 app.use(morgan("dev"));
 app.use(express.json());
 
