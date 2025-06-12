@@ -9,12 +9,27 @@ const { initializeSocket } = require("./socket");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const API_BASE_URL = process.env.API_BASE_URL || /localhost/;
 
 // Middleware
-app.use(cors({ origin: API_BASE_URL})); 
+const allowedOrigins = [
+  'https://sockettictactoe.netlify.app',
+  'http://localhost:5173'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Not allowed by CORS: ${origin}`));
+    }
+  },
+  credentials: true
+}));
+
 app.use(morgan("dev"));
 app.use(express.json());
+
 
 // Routes
 app.use(require("./api/auth").router);
